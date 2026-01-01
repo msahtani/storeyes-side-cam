@@ -1,0 +1,118 @@
+WINDOWS → RASPBERRY PI
+CLEAN & SECURE SMB AUTO-MOUNT SETUP
+==================================
+
+Goal
+----
+- Share a Windows folder with a Raspberry Pi
+- Avoid passing the password in commands
+- Mount automatically at boot
+- Keep the setup clean, secure, and stable
+
+
+Environment
+-----------
+Windows PC:
+- IP address: 192.168.0.202
+- Username: m0hcine19
+- Folder location: C:\Users\dell\Desktop\POINTEX21
+
+Raspberry Pi:
+- User: m0hcine24
+- Mount point: /home/m0hcine24/shared/POINTEX21
+
+
+Important SMB Concept
+---------------------
+SMB mounts SHARES, not Windows filesystem paths.
+
+Windows internally maps:
+  C:\Users\dell\Desktop\POINTEX21
+
+Linux only sees:
+  //WINDOWS_IP/SHARE_NAME
+
+In this setup, Windows allows access to the subpath, so the full path works,
+but using credentials + fstab is still required for a clean setup.
+
+
+Step 1 — Install SMB client on Raspberry Pi
+-------------------------------------------
+sudo apt update
+sudo apt install -y cifs-utils
+
+
+Step 2 — Create local mount directory
+-------------------------------------
+mkdir -p ~/shared/POINTEX21
+
+
+Step 3 — Create a secure credentials file
+-----------------------------------------
+nano ~/.smbcredentials
+
+Put ONLY this inside the file:
+username=m0hcine19
+password=2001
+
+Save and exit.
+
+Secure the file:
+chmod 600 ~/.smbcredentials
+
+
+Step 4 — Configure auto-mount on boot
+-------------------------------------
+Edit fstab:
+sudo nano /etc/fstab
+
+Add this line at the end:
+
+//192.168.0.202/Users/dell/Desktop/POINTEX21 /home/m0hcine24/shared/POINTEX21 cifs credentials=/home/m0hcine24/.smbcredentials,vers=3.0,uid=1000,gid=1000,iocharset=utf8,_netdev,nofail 0 0
+
+
+Explanation of options
+----------------------
+credentials=...   → avoids putting password in plaintext
+vers=3.0          → modern SMB protocol
+uid=1000,gid=1000 → files owned by Pi user (no sudo needed)
+_netdev           → wait for network before mounting
+nofail            → Pi boots even if Windows PC is off
+iocharset=utf8    → safe filenames
+
+
+Step 5 — Test the configuration (NO reboot yet)
+------------------------------------------------
+sudo mount -a
+
+If there is NO error, verify:
+ls ~/shared/POINTEX21
+
+
+Step 6 — Reboot test (final check)
+----------------------------------
+sudo reboot
+
+After reboot:
+mount | grep POINTEX21
+
+If listed → mount is successful.
+
+
+Result
+------
+- Windows folder is mounted automatically at boot
+- No password appears in commands or history
+- Read/write access works as normal user
+- System boots even if Windows PC is offline
+
+
+Notes
+-----
+- If the Windows IP changes, update /etc/fstab
+- For higher performance on Linux-only networks, NFS can be used instead of SMB
+- This mount can be used inside Docker containers if needed
+
+
+END
+===
